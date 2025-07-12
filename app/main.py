@@ -1,6 +1,13 @@
 from fastapi import FastAPI, HTTPException
 from sqlmodel import SQLModel, create_engine, Session, select
 from models import Account, Transaction
+from pydantic import BaseModel
+from datetime import datetime
+
+class TransactionCreate(BaseModel):
+    from_account_id: int
+    to_account_id: int
+    amount: float
 
 app = FastAPI()
 
@@ -36,24 +43,30 @@ def get_balance(account_id: int):
     
 # Endpoint: Make a transaction
 @app.post("/transactions/", response_model=Transaction)
-def make_transaction(transaction: Transaction):
+def make_transaction(transaction: TransactionCreate):
     with Session(engine) as session:
         from_acc = session.get(Account, transaction.from_account_id)
         to_acc = session.get(Account, transaction.to_account_id)
 
         if not from_acc or not to_acc:
             raise HTTPException(status_code=404, detail="Account not found")
-        
         if from_acc.balance < transaction.amount:
             raise HTTPException(status_code=400, detail="Insufficient funds")
-        
+
         from_acc.balance -= transaction.amount
         to_acc.balance += transaction.amount
 
-        session.add(transaction)
+        db_transaction = Transaction(
+            from_account_id=transaction.from_account_id,
+            to_account_id=transaction.to_account_id,
+            amount=transaction.amount,
+            timestamp=datetime.utcnow()  # always set datetime in backend
+        )
+
+        session.add(db_transaction)
         session.commit()
-        session.refresh(transaction)
-        return transaction
+        session.refresh(db_transaction)
+        return db_transaction
     
 # Endpoint: List of all transactions
 @app.get("/transactions/")
