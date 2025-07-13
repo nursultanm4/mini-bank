@@ -1,13 +1,23 @@
 from fastapi import FastAPI, HTTPException
 from sqlmodel import SQLModel, create_engine, Session, select
 from models import Account, Transaction
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, validator
 from datetime import datetime
+
+class AccountCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=20)
+    balance: float = Field(ge=0, default=0.0)
+
+    @validator('name')
+    def name_must_not_be_blank(cls, v):
+        if not v.strip():
+            raise ValueError('Name must not be blank')
+        return v
 
 class TransactionCreate(BaseModel):
     from_account_id: int
     to_account_id: int
-    amount: float
+    amount: float = Field(gt=0) # amount must be > 0
 
 app = FastAPI()
 
@@ -23,12 +33,14 @@ def on_startup():
 
 # Endpoint: Create a new account 
 @app.post("/accounts/", response_model=Account)
-def create_account(account: Account):
+def create_account(account: AccountCreate):
     with Session(engine) as session: # engine is our DB here
-        session.add(account)
+        # updated endpoint here
+        db_account = Account(name=account.name, balance=account.balance)
+        session.add(db_account)
         session.commit()
-        session.refresh(account)
-        return account
+        session.refresh(db_account) 
+        return db_account
 
 # Endpoint: Get account balance
 @app.get("/accounts/{account_id}/balance")
