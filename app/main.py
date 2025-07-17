@@ -3,6 +3,19 @@ from sqlmodel import SQLModel, create_engine, Session, select
 from models import Account, Transaction
 from pydantic import BaseModel, Field, validator
 from datetime import datetime
+from passlib.context import CryptContext
+
+app = FastAPI()
+
+# Password hashing
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto") # a config object
+
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password) # .hash - a passlib method, creates a secure hash for passw
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+
 
 class AccountCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=20)
@@ -13,13 +26,11 @@ class AccountCreate(BaseModel):
         if not v.strip():
             raise ValueError('Name must not be blank')
         return v
-
+    
 class TransactionCreate(BaseModel):
     from_account_id: int
     to_account_id: int
     amount: float = Field(gt=0) # amount must be > 0
-
-app = FastAPI()
 
 # Setup db
 sqlite_file_name = "database.db"
