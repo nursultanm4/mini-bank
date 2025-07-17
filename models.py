@@ -14,3 +14,8 @@ class Transaction(SQLModel, table=True):
     amount: float
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
+class User(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    username: str = Field(index=True, unique=True)
+    hashed_password: str
+
