@@ -1,9 +1,13 @@
 from fastapi import FastAPI, HTTPException
 from sqlmodel import SQLModel, create_engine, Session, select
-from models import Account, Transaction
+from models import Account, Transaction, User
 from pydantic import BaseModel, Field, validator
 from datetime import datetime
 from passlib.context import CryptContext
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = FastAPI()
 
@@ -15,6 +19,66 @@ def hash_password(password: str) -> str:
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
+
+# JWT token utilities
+from jose import JWTError, jwt
+from datetime import timedelta
+
+SECRET_KEY = os.getenv("SECRET_KEY")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+def create_access_token(data: dict, expires_delta: timedelta = None):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=15))
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+# Setup db
+sqlite_file_name = "database.db"
+sqlite_url = f"sqlite:///{sqlite_file_name}"
+engine = create_engine(sqlite_url, echo=True)
+
+# Create tables 
+@app.on_event("startup")
+def on_startup():
+    SQLModel.metadata.create_all(engine)
+
+# Registration and LOGIN 
+from fastapi import Depends, status
+
+class UserCreate(BaseModel):
+    username: str
+    password: str
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+# Endpoint: Register
+@app.post("/register/", response_model=User)
+def register(user: UserCreate):
+    with Session(engine) as session: # engine is our DB here
+        # Check if user already exists
+        existing = session.exec(select(User).where(User.username == user.username)).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Username already registered")
+        hashed_pw = hash_password(user.password)
+        db_user = User(username=user.username, hashed_password=hashed_pw)        
+        session.add(db_user)
+        session.commit()
+        session.refresh()
+        return db_user
+
+# Endpoint: Login
+@app.post("/login/", response_model=Token)
+def login(user: UserCreate):
+    with Session(engine) as session:
+        db_user = session.exec(select(User).where(User.username == user.username)).first() # check DB if theres user with such data
+        if not db_user:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+        access_token = create_access_token(data={"sub": db_user.username})
+        return Token(access_token=access_token, token_type="bearer")
 
 
 class AccountCreate(BaseModel):
@@ -32,20 +96,11 @@ class TransactionCreate(BaseModel):
     to_account_id: int
     amount: float = Field(gt=0) # amount must be > 0
 
-# Setup db
-sqlite_file_name = "database.db"
-sqlite_url = f"sqlite:///{sqlite_file_name}"
-engine = create_engine(sqlite_url, echo=True)
-
-# Create tables 
-@app.on_event("startup")
-def on_startup():
-    SQLModel.metadata.create_all(engine)
 
 # Endpoint: Create a new account 
 @app.post("/accounts/", response_model=Account)
 def create_account(account: AccountCreate):
-    with Session(engine) as session: # engine is our DB here
+    with Session(engine) as session: 
         # updated endpoint here
         db_account = Account(name=account.name, balance=account.balance)
         session.add(db_account)
@@ -97,4 +152,3 @@ def get_transactions():
     with Session(engine) as session:
         transactions = session.exec(select(Transaction)).all()
         return transactions
-    
