@@ -67,7 +67,7 @@ def register(user: UserCreate):
         db_user = User(username=user.username, hashed_password=hashed_pw)        
         session.add(db_user)
         session.commit()
-        session.refresh()
+        session.refresh(db_user)
         return db_user
 
 # Endpoint: Login
@@ -80,6 +80,34 @@ def login(user: UserCreate):
         access_token = create_access_token(data={"sub": db_user.username})
         return Token(access_token=access_token, token_type="bearer")
 
+
+# Extract the token from the request,
+# Decodes the JWT token using the secret key,
+# Extracts the username from the token's payload,
+# Checks if the user exists in the database,
+# If the user exists — returns the user object,
+# If not, or if the token is invalid — raises a 401 Unauthorized error.
+
+# Authentication Dependency
+from fastapi.security import OAuth2PasswordBearer
+from fastapi import Depends
+
+# This tells FastAPI how to get the token from the request
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+
+def get_current_user(token: str = Depends(oauth2_scheme)):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=ALGORITHM)
+        username: str = payload.get("sub")
+        if username is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    with Session(engine) as session:
+        user = session.exec(select(User).where(User.username == username)).first()
+        if user is None:
+            raise HTTPException(status_code=401,detail="User not found")
+        return user
 
 class AccountCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=20)
@@ -99,9 +127,11 @@ class TransactionCreate(BaseModel):
 
 # Endpoint: Create a new account 
 @app.post("/accounts/", response_model=Account)
-def create_account(account: AccountCreate):
+def create_account(
+    account: AccountCreate,
+    current_user: User = Depends(get_current_user) # Require authentication
+):
     with Session(engine) as session: 
-        # updated endpoint here
         db_account = Account(name=account.name, balance=account.balance)
         session.add(db_account)
         session.commit()
