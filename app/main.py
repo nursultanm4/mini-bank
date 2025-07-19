@@ -42,7 +42,7 @@ engine = create_engine(sqlite_url, echo=True)
 # Create tables 
 @app.on_event("startup")
 def on_startup():
-    SQLModel.metadata.create_all(engine)
+    SQLModel.metadata.create_all(engine) # table created
 
 # Registration and LOGIN 
 from fastapi import Depends, status
@@ -64,10 +64,11 @@ def register(user: UserCreate):
         if existing:
             raise HTTPException(status_code=400, detail="Username already registered")
         hashed_pw = hash_password(user.password)
+        # CRUD ( Create, Read, Update, Delete )
         db_user = User(username=user.username, hashed_password=hashed_pw)        
-        session.add(db_user)
-        session.commit()
-        session.refresh(db_user)
+        session.add(db_user) # add - add the user to DB
+        session.commit() # commit - confirm the changes
+        session.refresh(db_user) # refresh - update the object
         return db_user
 
 # Endpoint: Login
@@ -79,7 +80,6 @@ def login(user: UserCreate):
             raise HTTPException(status_code=401, detail="Invalid credentials")
         access_token = create_access_token(data={"sub": db_user.username})
         return Token(access_token=access_token, token_type="bearer")
-
 
 # Extract the token from the request,
 # Decodes the JWT token using the secret key,
