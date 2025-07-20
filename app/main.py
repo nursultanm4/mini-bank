@@ -45,7 +45,11 @@ def create_account(
     current_user: User = Depends(get_current_user)
 ):
     with Session(engine) as session:
-        db_account = Account(name=account.name, balance=account.balance)
+        db_account = Account(
+            name=account.name, 
+            balance=account.balance, 
+            user_id=current_user.id
+            )
         session.add(db_account)
         session.commit()
         session.refresh(db_account)
@@ -53,7 +57,7 @@ def create_account(
 
 # Get account balance
 @app.get("/accounts/{account_id}/balance")
-def get_balance(account_id: int):
+def get_balance(account_id: int, current_user: User = Depends(get_current_user)):
     with Session(engine) as session:
         account = session.get(Account, account_id)
         if not account:
@@ -62,7 +66,10 @@ def get_balance(account_id: int):
 
 # Make a transaction
 @app.post("/transactions/", response_model=Transaction)
-def make_transaction(transaction: TransactionCreate):
+def make_transaction(
+    transaction: TransactionCreate,
+    current_user: User = Depends(get_current_user)
+    ):
     with Session(engine) as session:
         from_acc = session.get(Account, transaction.from_account_id)
         to_acc = session.get(Account, transaction.to_account_id)
@@ -85,7 +92,15 @@ def make_transaction(transaction: TransactionCreate):
 
 # List of all transactions
 @app.get("/transactions/")
-def get_transactions():
+def get_transactions(current_user: User = Depends(get_current_user)):
     with Session(engine) as session:
-        transactions = session.exec(select(Transaction)).all()
+        # Get all accounts owned by the user
+        user_accounts = session.exec(select(Account.id).where(Account.user_id==current_user.id)).first()
+        # Get all transactions where the user is sender or receiver
+        transactions = session.exec(
+            select(Transaction).where(
+                (Transaction.from_account_id.in_(user_accounts)) |
+                (Transaction.to_account_id.in_(user_accounts))
+            )
+        ).all()
         return transactions

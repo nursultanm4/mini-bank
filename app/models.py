@@ -6,6 +6,7 @@ class Account(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str
     balance: float = 0.0
+    user_id: int = Field(foreign_key="user.id")
 
 class Transaction(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
