@@ -1,9 +1,9 @@
 from fastapi import FastAPI, HTTPException, Depends, status
 from sqlmodel import Session, select
-from .models import Account, Transaction, User
-from .schemas import UserCreate, Token, AccountCreate, TransactionCreate
-from .auth import hash_password, verify_password, create_access_token, get_current_user
-from .db import engine, on_startup
+from app.models import Account, Transaction, User
+from app.schemas import UserCreate, Token, AccountCreate, TransactionCreate
+from app.auth import hash_password, verify_password, create_access_token, get_current_user
+from app.db import engine, on_startup
 from datetime import datetime
 
 app = FastAPI()
@@ -12,12 +12,13 @@ app = FastAPI()
 def startup():
     on_startup()
 
+
 # Register
 @app.post("/register/", response_model=User)
 def register(user: UserCreate):
     with Session(engine) as session:
         # Check if user already exists
-        existing = session.exec(select(User).where(User.username == user.username)).first()
+        existing = session.exec(select(User).where(User.username == user.username)).first() 
         if existing:
             raise HTTPException(status_code=400, detail="Username already registered")
         hashed_pw = hash_password(user.password)
@@ -28,6 +29,7 @@ def register(user: UserCreate):
         session.refresh(db_user)
         return db_user
 
+
 # Login
 @app.post("/login/", response_model=Token)
 def login(user: UserCreate):
@@ -37,6 +39,7 @@ def login(user: UserCreate):
             raise HTTPException(status_code=401, detail="Invalid credentials")
         access_token = create_access_token(data={"sub": db_user.username})
         return Token(access_token=access_token, token_type="bearer")
+
 
 # Create a new account
 @app.post("/accounts/", response_model=Account)
@@ -55,6 +58,7 @@ def create_account(
         session.refresh(db_account)
         return db_account
 
+
 # Get account balance
 @app.get("/accounts/{account_id}/balance")
 def get_balance(account_id: int, current_user: User = Depends(get_current_user)):
@@ -63,6 +67,7 @@ def get_balance(account_id: int, current_user: User = Depends(get_current_user))
         if not account:
             raise HTTPException(status_code=404, detail="Account not found")
         return {"account_id": account_id, "balance": account.balance}
+
 
 # Make a transaction
 @app.post("/transactions/", response_model=Transaction)
@@ -89,6 +94,7 @@ def make_transaction(
         session.commit()
         session.refresh(db_transaction)
         return db_transaction
+
 
 # List of all transactions
 @app.get("/transactions/")
