@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, validator
-
+    
 
 class UserCreate(BaseModel):
     username: str

@@ -5,17 +5,50 @@ from app.schemas import UserCreate, Token, AccountCreate, TransactionCreate
 from app.auth import hash_password, verify_password, create_access_token, get_current_user
 from app.db import engine, on_startup
 from datetime import datetime
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from fastapi import Request
+from slowapi.errors import RateLimitExceeded
+from slowapi.extension import Limiter as LimiterExtension
+
+
+# Create limiter instance
+limiter = Limiter(key_func=get_remote_address)
+
 
 app = FastAPI()
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+async def login_key_func(request: Request):
+    # Extract username from request body for Login
+    try:
+        body = await request.json()
+        return body.get("username", get_remote_address(request)) # Fallback, dict.get(key, fallback_value)
+    except Exception:
+        return get_remote_address(request) # Fallback
+        
+
+async def register_key_func(request: Request):
+    # Extract username from request body for Register
+    try:
+        body = await request.json()
+        return body.get("username", get_remote_address(request))
+    except Exception:
+        return get_remote_address(request)    
+
 
 @app.on_event("startup")
 def startup():
     on_startup()
 
 
-# Register
+# Register  (limit: 5 requests per minute per username)
 @app.post("/register/", response_model=User)
-def register(user: UserCreate):
+@limiter.limit("5/minute", key_func=register_key_func)
+async def register(user: UserCreate, request: Request):
     with Session(engine) as session:
         # Check if user already exists
         existing = session.exec(select(User).where(User.username == user.username)).first() 
@@ -30,9 +63,10 @@ def register(user: UserCreate):
         return db_user
 
 
-# Login
+# Login  (limit: 10 requests per minute per username)
 @app.post("/login/", response_model=Token)
-def login(user: UserCreate):
+@limiter.limit("10/minute", key_func=login_key_func)
+async def login(user: UserCreate, request: Request):
     with Session(engine) as session:
         db_user = session.exec(select(User).where(User.username == user.username)).first()
         if not db_user:
