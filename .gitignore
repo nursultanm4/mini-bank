@@ -1,11 +1,18 @@
-# virtual env
-venv/
+# Logs
+/logs
 
-# cache 
+
+# Environment files
+.env
+
+
+# Cache
 __pycache__/
 
-# db files
-*.db
 
-# env
-.env
+# Virtual environments
+venv/
+
+
+# DB files
+*.db
