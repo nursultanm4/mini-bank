@@ -146,7 +146,7 @@ async def make_transaction(
             timestamp=datetime.utcnow()
         )
         session.add(db_transaction)
-        session.commit()
+        session.commit()    
         session.refresh(db_transaction)
         logging.info(f"Transaction: {transaction.amount} from {from_acc.id} to {to_acc.id} by user {current_user.username}")
         return db_transaction
@@ -166,3 +166,4 @@ async def get_transactions(current_user: User = Depends(get_current_user)):
             )
         ).all()
         return transactions
+    

@@ -1,5 +1,4 @@
 from sqlmodel import SQLModel, create_engine
-from fastapi import FastAPI
 
 
 sqlite_file_name = "database.db"

@@ -7,13 +7,12 @@ class UserCreate(BaseModel):
 
     @validator('password')
     def password_policy(cls, v):
-
         if len(v) < 8:
             raise ValueError('Password must be at least 8 characters long')
         
         if not any(char.isdigit() for char in v):
             raise ValueError('Password must contain at least one digit')
-
+        
         if not any(char.isalpha() for char in v):
             raise ValueError('Password must contain at least one letter')
         
@@ -39,10 +38,10 @@ class AccountCreate(BaseModel):
         
         # Remove unnecessary / dangerous chars
         unnecessary = ['<', '>', '"', "'", ';', '--']
+
         for char in unnecessary:
             if char in v:
                 raise ValueError('Account name contains invalid characters')
-
         return v
 
     
