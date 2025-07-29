@@ -9,7 +9,7 @@ A lightweight banking backend built with FastAPI — supports user-to-user money
 - 💰 Balance inquiry
 - 📜 Transaction history tracking
 - 🐳 Easy Docker setup for local development
-- 🧪 Simple and clean code structure for learning backend development
+- 🧪 Simple and clean code structure
 
 ## 🛠 Tech Stack
 
